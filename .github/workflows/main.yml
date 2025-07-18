@@ -1,0 +1,194 @@
+name: Deploy MedicOp AI Website
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg portaudio19-dev
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run application tests
+      run: |
+        # Add your test commands here if you have any
+        python -c "import gradio; print('Gradio imported successfully')"
+        python -c "import sys; print('Python version:', sys.version)"
+
+    - name: Build application
+      run: |
+        # Pre-build steps if needed
+        echo "Building MedicOp AI application..."
+        
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg portaudio19-dev
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Create static build
+      run: |
+        # Create a static version of your Gradio app
+        mkdir -p ./build
+        
+        # Copy necessary files
+        cp -r . ./build/
+        
+        # Create an index.html that launches your Gradio app
+        cat > ./build/index.html << 'EOF'
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>MedicOp AI - Medical AI Assistant</title>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    max-width: 800px;
+                    margin: 0 auto;
+                    padding: 20px;
+                    background-color: #f5f5f5;
+                }
+                .container {
+                    background: white;
+                    padding: 30px;
+                    border-radius: 10px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                }
+                .phase-button {
+                    display: inline-block;
+                    margin: 10px;
+                    padding: 15px 25px;
+                    background-color: #007bff;
+                    color: white;
+                    text-decoration: none;
+                    border-radius: 5px;
+                    transition: background-color 0.3s;
+                }
+                .phase-button:hover {
+                    background-color: #0056b3;
+                }
+                .instructions {
+                    margin-top: 30px;
+                    padding: 20px;
+                    background-color: #e9ecef;
+                    border-radius: 5px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>🏥 MedicOp AI - Medical AI Assistant</h1>
+                <p>Welcome to MedicOp AI, an advanced medical AI assistant with multiple phases for comprehensive healthcare support.</p>
+                
+                <h2>🚀 Application Phases</h2>
+                <div>
+                    <a href="#" class="phase-button">Phase 1: Brain of the Doctor</a>
+                    <a href="#" class="phase-button">Phase 2: Voice of the Patient</a>
+                    <a href="#" class="phase-button">Phase 3: Voice of the Doctor</a>
+                    <a href="#" class="phase-button">Phase 4: Gradio UI</a>
+                </div>
+                
+                <div class="instructions">
+                    <h3>📋 Setup Instructions</h3>
+                    <p>To run this application locally:</p>
+                    <ol>
+                        <li>Clone the repository</li>
+                        <li>Install dependencies: <code>pip install -r requirements.txt</code></li>
+                        <li>Install system dependencies (FFmpeg and PortAudio)</li>
+                        <li>Run the desired phase or the Gradio UI</li>
+                    </ol>
+                </div>
+                
+                <div class="instructions">
+                    <h3>🔗 Repository</h3>
+                    <p>View the source code on <a href="https://github.com/HardikOberoi/medicop-ai">GitHub</a></p>
+                </div>
+            </div>
+        </body>
+        </html>
+        EOF
+
+    - name: Setup Pages
+      uses: actions/configure-pages@v3
+      
+    - name: Upload to GitHub Pages
+      uses: actions/upload-pages-artifact@v2
+      with:
+        path: ./build
+
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v2
+
+  # Optional: Deploy to a cloud platform (uncomment if needed)
+  # deploy-to-cloud:
+  #   needs: build-and-test
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+  #   
+  #   steps:
+  #   - name: Checkout repository
+  #     uses: actions/checkout@v4
+  #     
+  #   - name: Deploy to Heroku/Railway/etc
+  #     run: |
+  #       # Add your cloud deployment commands here
+  #       echo "Deploy to cloud platform"
